@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports:
+      - '${PORT:-3000}:3000'
+    environment:
+      PORT: 3000
+      DB_PATH: /app/data/tasks.sqlite
+      DB_LOGGING: '${DB_LOGGING:-false}'
+    volumes:
+      # Persiste el fichero SQLite entre reinicios del contenedor.
+      - ./data:/app/data
+    restart: unless-stopped
