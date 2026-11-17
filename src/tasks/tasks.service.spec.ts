@@ -185,7 +185,9 @@ describe('TasksService', () => {
     it('aplica solo los campos recibidos', async () => {
       const task = buildTask();
       repository.findOne.mockResolvedValue(task);
-      repository.save.mockImplementation(async (entity) => entity as Task);
+      repository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as Task),
+      );
 
       const result = await service.update(TASK_ID, {
         status: TaskStatus.DONE,
