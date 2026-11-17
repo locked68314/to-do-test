@@ -9,8 +9,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
+import { PaginatedResult } from '../common/dto/paginated-result';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { QueryTasksDto } from './dto/query-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
 import { TasksService } from './tasks.service';
@@ -25,8 +28,8 @@ export class TasksController {
   }
 
   @Get()
-  findAll(): Promise<Task[]> {
-    return this.tasksService.findAll();
+  findAll(@Query() query: QueryTasksDto): Promise<PaginatedResult<Task>> {
+    return this.tasksService.findAll(query);
   }
 
   @Get(':id')

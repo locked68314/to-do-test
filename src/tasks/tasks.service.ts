@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import {
+  buildPaginatedResult,
+  PaginatedResult,
+} from '../common/dto/paginated-result';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { QueryTasksDto } from './dto/query-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
 import { TaskStatus } from './enums/task-status.enum';
@@ -25,8 +30,28 @@ export class TasksService {
     return this.tasksRepository.save(task);
   }
 
-  async findAll(): Promise<Task[]> {
-    return this.tasksRepository.find({ order: { dueDate: 'ASC' } });
+  async findAll(query: QueryTasksDto): Promise<PaginatedResult<Task>> {
+    const { page, limit, status, assignee } = query;
+
+    // Solo se filtra por lo que llega: un filtro ausente no restringe nada.
+    const where: FindOptionsWhere<Task> = {};
+
+    if (status !== undefined) {
+      where.status = status;
+    }
+
+    if (assignee !== undefined) {
+      where.assignee = assignee;
+    }
+
+    const [data, total] = await this.tasksRepository.findAndCount({
+      where,
+      order: { dueDate: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return buildPaginatedResult(data, total, page, limit);
   }
 
   /** Devuelve la tarea o lanza 404; punto único de ese error. */
