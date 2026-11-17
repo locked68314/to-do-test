@@ -1,98 +1,188 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# API de tareas
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST de gestión de tareas construida con **NestJS 11**, **TypeORM** y **SQLite**.
+Permite crear, listar, consultar, editar y borrar tareas, con filtros por estado y
+responsable, paginación, validación de entrada y esquema versionado en migraciones.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+| Pieza | Elección |
+| --- | --- |
+| Framework | NestJS 11 (Express) |
+| Persistencia | TypeORM + SQLite (driver `better-sqlite3`) |
+| Validación | `class-validator` / `class-transformer` vía `ValidationPipe` global |
+| Documentación | Swagger en `/api/docs` |
+| Tests | Jest (unitarios) + Supertest (e2e sobre SQLite en memoria) |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Puesta en marcha
 
 ```bash
-$ pnpm install
+pnpm install
+cp .env.example .env     # opcional: los valores por defecto ya funcionan
+pnpm migration:run       # crea data/tasks.sqlite y aplica el esquema
+pnpm start:dev           # API en http://localhost:3000/api
 ```
 
-## Compile and run the project
+Documentación interactiva: <http://localhost:3000/api/docs>
+
+### Variables de entorno
+
+| Variable | Por defecto | Descripción |
+| --- | --- | --- |
+| `PORT` | `3000` | Puerto HTTP |
+| `DB_PATH` | `./data/tasks.sqlite` | Fichero SQLite (lo usan la app y el CLI de migraciones) |
+| `DB_LOGGING` | `false` | `true` para volcar las consultas SQL |
+
+## Modelo de tarea
+
+| Campo | Tipo | Notas |
+| --- | --- | --- |
+| `id` | uuid | Generado por la API |
+| `title` | string | Obligatorio, máx. 120 caracteres |
+| `description` | string \| null | Opcional, máx. 1000 caracteres |
+| `status` | enum | `pending` (pendiente), `in_progress` (en curso), `done` (hecha). Por defecto `pending` |
+| `assignee` | string | Responsable (nombre o email), obligatorio, máx. 120 caracteres |
+| `dueDate` | fecha ISO 8601 | Fecha límite, obligatoria |
+| `createdAt` / `updatedAt` | fecha ISO 8601 | Gestionadas por la API |
+
+## Endpoints
+
+Todos bajo el prefijo `/api`.
+
+| Método | Ruta | Éxito | Errores |
+| --- | --- | --- | --- |
+| `POST` | `/api/tasks` | `201` | `400` validación |
+| `GET` | `/api/tasks` | `200` | `400` filtro o paginación inválidos |
+| `GET` | `/api/tasks/:id` | `200` | `400` id no uuid, `404` no existe |
+| `PATCH` | `/api/tasks/:id` | `200` | `400` validación, `404` no existe |
+| `DELETE` | `/api/tasks/:id` | `204` | `400` id no uuid, `404` no existe |
+
+### Listado: filtros y paginación
+
+`GET /api/tasks` acepta:
+
+| Parámetro | Por defecto | Descripción |
+| --- | --- | --- |
+| `status` | — | Filtra por estado (`pending`, `in_progress`, `done`) |
+| `assignee` | — | Filtra por responsable (coincidencia exacta) |
+| `page` | `1` | Página, mínimo 1 |
+| `limit` | `10` | Tamaño de página, entre 1 y 100 |
+
+Los resultados se ordenan por fecha límite ascendente y llegan envueltos con sus
+metadatos de paginación:
+
+```json
+{
+  "data": [
+    {
+      "id": "3d17b3ad-bf8a-4283-b3a4-e99f83aa3593",
+      "title": "Preparar informe trimestral",
+      "description": "Incluir cierre de Q4",
+      "status": "pending",
+      "assignee": "ana@acme.com",
+      "dueDate": "2026-12-01T00:00:00.000Z",
+      "createdAt": "2026-11-17T01:20:37.000Z",
+      "updatedAt": "2026-11-17T01:20:37.000Z"
+    }
+  ],
+  "meta": { "total": 1, "page": 1, "limit": 10, "totalPages": 1 }
+}
+```
+
+Cualquier parámetro no reconocido devuelve `400`: el `ValidationPipe` se configura
+con `whitelist` y `forbidNonWhitelisted`, así que un filtro mal escrito falla en vez
+de ignorarse en silencio.
+
+### Ejemplos
 
 ```bash
-# development
-$ pnpm run start
+# Crear
+curl -X POST localhost:3000/api/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Preparar informe","description":"Cierre Q4","assignee":"ana@acme.com","dueDate":"2026-12-01T00:00:00.000Z"}'
 
-# watch mode
-$ pnpm run start:dev
+# Listar con filtros y paginación
+curl 'localhost:3000/api/tasks?status=pending&assignee=ana@acme.com&page=1&limit=5'
 
-# production mode
-$ pnpm run start:prod
+# Ver, editar y borrar
+curl localhost:3000/api/tasks/<id>
+curl -X PATCH localhost:3000/api/tasks/<id> \
+  -H 'Content-Type: application/json' -d '{"status":"in_progress"}'
+curl -X DELETE localhost:3000/api/tasks/<id>
 ```
 
-## Run tests
+Respuesta de error, con el formato estándar de Nest:
+
+```json
+{
+  "message": ["status debe ser uno de: pending, in_progress, done"],
+  "error": "Bad Request",
+  "statusCode": 400
+}
+```
+
+## Migraciones
+
+El esquema nunca se sincroniza automáticamente (`synchronize: false`): se versiona en
+`src/database/migrations`. La app y el CLI comparten las opciones definidas en
+[`src/config/database.config.ts`](src/config/database.config.ts).
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm migration:run                              # aplicar pendientes
+pnpm migration:show                             # ver estado
+pnpm migration:revert                           # deshacer la última
+pnpm migration:generate src/database/migrations/NombreDelCambio  # generar desde las entidades
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Tests
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm test        # unitarios del servicio (repositorio mockeado)
+pnpm test:e2e    # e2e con Supertest contra SQLite en memoria
+pnpm test:cov    # cobertura
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Los e2e arrancan la aplicación real sobre una base en memoria aplicando las
+migraciones (`migrationsRun: true`), de modo que también validan el esquema
+versionado, y cubren el ciclo completo del CRUD, los filtros, la paginación y los
+códigos de error.
 
-## Resources
+## Docker
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+docker compose up --build    # API en http://localhost:3000/api
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+El fichero SQLite se persiste en el volumen `./data`. Las migraciones se aplican al
+arrancar el contenedor.
 
-## Support
+## Estructura
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```
+src/
+├── common/dto/          DTO de paginación y envoltorio de resultados
+├── config/              opciones de TypeORM compartidas por app y CLI
+├── database/            DataSource del CLI y migraciones
+├── tasks/               módulo de tareas (controlador, servicio, DTOs, entidad)
+├── app.module.ts
+├── app.setup.ts         prefijo y validación comunes a app y tests e2e
+├── main.ts
+└── swagger.setup.ts
+test/
+└── tasks.e2e-spec.ts
+```
 
-## Stay in touch
+## Decisiones de diseño
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **`assignee` como texto** en lugar de una entidad `User`: el enunciado solo pide
+  filtrar por responsable, así que una tabla de usuarios añadiría superficie sin
+  aportar nada al caso de uso.
+- **Identificadores y estados en inglés** (`in_progress`, `assignee`, `dueDate`)
+  siguiendo la convención habitual del código, con el mapeo a los nombres del
+  enunciado documentado arriba.
+- **Sin filtro de excepciones propio**: los filtros por defecto de Nest ya producen
+  el `statusCode` y el cuerpo correctos para `400`/`404`.
+- **`findAndCount` con índices** en `status` y `assignee`, los dos campos por los que
+  se filtra.
+- **Fechas límite en el pasado permitidas**: exigir fecha futura impediría editar una
+  tarea ya vencida.
