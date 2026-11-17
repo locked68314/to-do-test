@@ -186,3 +186,17 @@ test/
   se filtra.
 - **Fechas límite en el pasado permitidas**: exigir fecha futura impediría editar una
   tarea ya vencida.
+
+# Uso de IA en el proyecto
+
+Durante el desarrollo de este proyecto utilicé herramientas de IA como apoyo para acelerar tareas repetitivas y mejorar la calidad de algunos entregables. **Las decisiones de diseño, arquitectura y selección de tecnologías quedaron bajo mi responsabilidad**, al igual que la revisión, validación y adaptación de todo lo generado con IA.
+
+## Enfoque de uso
+
+La IA se utilizó como asistente técnico, no como sustituto de las decisiones de ingeniería. Su aporte se concentró en:
+
+- Generación de código base y fragmentos de implementación.
+- Generación y ampliación de pruebas automatizadas.
+- Redacción y mejora de documentación técnica.
+- Apoyo en la configuración de Docker y archivos relacionados.
+- Revisión de errores, sugerencias de refactorización y explicación de alternativas.
