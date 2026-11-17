@@ -1,14 +1,23 @@
-/** Envoltorio común de las respuestas paginadas. */
-export interface PaginationMeta {
+import { ApiProperty } from '@nestjs/swagger';
+
+/** Metadatos de paginación que acompañan a todo listado. */
+export class PaginationMetaDto {
+  @ApiProperty({ description: 'Total de elementos que cumplen el filtro' })
   total: number;
+
+  @ApiProperty({ description: 'Página devuelta', example: 1 })
   page: number;
+
+  @ApiProperty({ description: 'Tamaño de página aplicado', example: 10 })
   limit: number;
+
+  @ApiProperty({ description: 'Número total de páginas' })
   totalPages: number;
 }
 
 export interface PaginatedResult<T> {
   data: T[];
-  meta: PaginationMeta;
+  meta: PaginationMetaDto;
 }
 
 export function buildPaginatedResult<T>(

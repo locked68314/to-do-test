@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { DataSourceOptions } from 'typeorm';
+import type { BetterSqlite3DataSourceOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3DataSourceOptions';
 
 /** Fichero SQLite por defecto cuando no se define DB_PATH. */
 export const DEFAULT_DB_PATH = './data/tasks.sqlite';
@@ -11,7 +11,7 @@ export const DEFAULT_DB_PATH = './data/tasks.sqlite';
  */
 export function buildDataSourceOptions(
   env: NodeJS.ProcessEnv = process.env,
-): DataSourceOptions {
+): BetterSqlite3DataSourceOptions {
   return {
     type: 'better-sqlite3',
     database: env.DB_PATH ?? DEFAULT_DB_PATH,
